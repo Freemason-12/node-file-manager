@@ -70,8 +70,9 @@ function color(str, color, bold) {
 let currentDir = os.homedir();
 
 
-async function ls(dir) {
-  const content = await readdir(dir, { withFileTypes: true })
+async function ls(dir = currentDir) {
+  const fulldir = (dir === currentDir || !dir) ? dir : getFullPath(dir);
+  const content = await readdir(fulldir, { withFileTypes: true })
   const maxLength = Math.max(...content.map(x => x.name.length));
 
   const directories = content.filter(x => x.isDirectory())
@@ -95,14 +96,15 @@ async function ls(dir) {
   showInConsole(files)
 }
 
-function cd(dir) {
+function getFullDir(dir) {
   const dirtree = currentDir.split('/');
   const path = dir.split('/');
+
   while(path[path.length - 1] === '') path.pop();
+
   let pathExists = true;
   for(let i of path) {
     const possibleDir = dirtree.join('/') + `/${i}`
-    // console.log(possibleDir)
     if(i === '..') dirtree.pop();
     else if(i === '.') continue;
     else if(fs.existsSync(possibleDir)) {
@@ -117,34 +119,62 @@ function cd(dir) {
       break;
     }
   }
-  // console.log(dirtree)
-  if(pathExists) currentDir = dirtree.join('/');
+
+  if(pathExists) return dirtree.join('/');
+  else return null;
+}
+
+function getFullPath(filepath) {
+  const lastIndex = filepath.lastIndexOf('/')
+
+  const fulldir = (lastIndex !== -1) ? getFullDir(filepath.slice(0, lastIndex)) : currentDir;
+
+  if(fulldir === null) {
+    console.log(`"${fulldir}" no such path`);
+    return null;
+  }
+
+  const fullpath = (lastIndex !== -1) ?
+        fulldir + `/${filepath.slice(lastIndex)}` :
+        fulldir + `/${filepath}`;
+
+  return fullpath;
+}
+
+function cd(dir) {
+  const finalPath = getFullDir(dir);
+  if(finalPath) currentDir = finalPath;
 }
 
 async function cat(filepath) {
-  const dirBackup = currentDir;
-  const lastIndex = filepath.lastIndexOf('/')
-  if(lastIndex !== -1) cd(filepath.slice(0, lastIndex));
-
-  const fullpath = (lastIndex !== -1) ?
-        currentDir + `/${filepath.slice(lastIndex)}` :
-        currentDir + `/${filepath}`;
+  const fullpath = getFullPath(filepath);
+  if(fullpath === null) return;
 
   if(!fs.statSync(fullpath).isFile()) {
     console.log(`"${fullpath}" is not a file`);
-    currentDir = dirBackup;
     return;
   }
 
-  currentDir = dirBackup;
   const file = fs.createReadStream(fullpath);
   file.setEncoding('utf8');
   for await(const chunk of file) console.log(chunk);
 }
 
-async function add(filename) {
+function add(filename) {
   if(filename.indexOf('/') !== -1) { console.log('filename cannot include slashes'); return; }
   fs.writeFile(currentDir + `/${filename}`, '', ()=>{});
+}
+
+function rn(old_filename, new_filename) {
+  const fullpath = getFullPath(old_filename);
+  const fulldir = fullpath.slice(0, fullpath.lastIndexOf('/'));
+  fs.rename(fullpath, `${fulldir}/${new_filename}`, () => {});
+}
+
+function rm(filepath) {
+  const fullpath = getFullPath(filepath);
+  if(fullpath === null) return;
+  fs.unlink(fullpath, () => {});
 }
 
 
@@ -158,11 +188,15 @@ async function main() {
     userInput = await rl.question('');
     const command = userInput.split(' ');
     switch (command[0]) {
-      case 'ls': ls(currentDir); break;
+      case 'exit': break;
+      case 'clear': console.clear(); break;
+      case 'ls': ls(command[1]); break;
       case 'cd': cd(command[1]); break;
       case 'up': cd('../'); break;
       case 'cat': cat(command[1]); break;
       case 'add': add(command[1]); break;
+      case 'rm': rm(command[1]); break;
+      case 'rn': rn(command[1], command[2]); break;
       default: console.log(`"${command[0]}" command not found`); break;
     }
   }
