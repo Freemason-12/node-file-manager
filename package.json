@@ -1,0 +1,13 @@
+{
+  "name": "file-manager",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "a little cli file manager written in JavaScript with NodeJS runtime",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "author": "Rsymbetov Maksat",
+  "license": "ISC"
+}
